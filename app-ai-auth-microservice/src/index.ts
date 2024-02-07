@@ -3,6 +3,7 @@ import cors from 'cors';
 import dbConnection from './connection/dbConnection';
 import express, { Request, Response , Application, NextFunction } from 'express';
 import dotenv from 'dotenv';
+import redisInit  from './services/redisService.service';
 
 dotenv.config();
 
@@ -16,6 +17,8 @@ const allowCrossDomain = function(req: Request, res: Response, next: NextFunctio
   res.header('Access-Control-Allow-Headers', 'Content-Type');
   next();
 };
+
+redisInit();
 
 app.use(cors());
 app.use(allowCrossDomain);

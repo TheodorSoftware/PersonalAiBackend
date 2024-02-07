@@ -1,11 +1,15 @@
 import { Request, Response } from "express";
-import { UserCredetials, UserRegisterData, UserToken } from "../models/User.interface";
+import { UserCredetials, UserRegisterData } from "../models/User.interface";
+import { InsertOneResult } from "mongodb";
+import { MailOption } from "../models/MailOption.interface";
+import { generateRecoverEmail } from "../utils/generateEmailContent.function";
+
+
 import UserService from "../services/userService.service";
 import jwt from 'jsonwebtoken';
-import { InsertOneResult } from "mongodb";
 import nodemailer, { Transporter } from 'nodemailer';
 import dotenv from 'dotenv';
-import { MailOption } from "../models/MailOption.interface";
+import { generateCode } from "../utils/generateCode.function";
 
 class UserController{
 
@@ -29,24 +33,14 @@ class UserController{
             from: process.env.EMAIL,
             to: '',    
             subject: 'Register Confirmation',
-            html: `
-                <div>
-                    Welcome to Open AI Personal Assistant.
-                    <button> Confirm </button>
-                </div>
-            `,
+            html: undefined
         };
         
         UserController.mailOptionForgot = {
             from: process.env.EMAIL,
             to: '',    
             subject: 'Forgot your password',
-            html: `
-                <div>
-                    Welcome to Open AI Personal Assistant.
-                    <button> Forgot your password </button>
-                </div>
-            `,
+            html: undefined
         }   
     }
 
@@ -91,19 +85,29 @@ class UserController{
 
     async forgotPassword(request: Request, response: Response){
         if(request.body){
-            let emailAddress: {email: string} = request.body;
-            let user = await UserService.getUserByEmail(emailAddress);
+            const emailAddress: {email: string} = request.body;
+            const user = await UserService.getUserByEmail(emailAddress);
             if(user){
-                response.send('Check your email')
-                UserController.mailOptionForgot.to = emailAddress.email
+                const recoveryCode:number = generateCode(4);
+
+                UserController.mailOptionForgot.html = generateRecoverEmail(recoveryCode);
+                UserController.mailOptionForgot.to = emailAddress.email;
                 UserController.transport.sendMail(UserController.mailOptionForgot, (error,info) => {
                     if (error) {
                         return console.error('Error sending email:', error);
                       }
                       console.log('Email sent:', info.response);
                 })
+
+                const recoveryToken = jwt.sign( 
+                    {recoveryCode},
+                    'your-secret-key',
+                    { expiresIn: '1h' }
+                )
+
+                response.send(recoveryToken);
             } else {
-                response.send('Email not found!');
+                response.status(404).send('Email not found!');
             }
         }
     }
